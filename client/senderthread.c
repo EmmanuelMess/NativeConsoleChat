@@ -15,7 +15,7 @@ void sendToServer(struct message message) {
 	switch (message.messageType) {
 		case USERNAME_MESSAGE: {
 			// Se guarda el nombre de usuario del cliente
-			strncpy(username, message.usernameMessage.username, MAX_SIZE_USERNAME - 1);
+			strncpy(username, message.usernameMessage.username, MAX_SIZE_USERNAME);
 			break;
 		}
 		default:

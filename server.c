@@ -165,7 +165,7 @@ void recieveTextMessage(size_t i, struct text_message textMessage) {
 		struct message msgResponse = {0};
 		msgResponse.messageType = NAMED_TEXT_MESSAGE;
 		strncpy(msgResponse.namedTextMessage.username, username, MAX_SIZE_USERNAME-1);
-		strncpy(msgResponse.namedTextMessage.data, textMessage.data, MAX_SIZE_MESSAGE - 1);
+		strncpy(msgResponse.namedTextMessage.data, textMessage.data, MAX_SIZE_MESSAGE);
 		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&msgResponse), sizeof(struct message), 0));
 	}
 
@@ -214,7 +214,7 @@ bool recieveUsername(size_t i, struct username_message message) {
 		return false;
 	}
 
-	strncpy(acceptedConnections[i].username, message.username, MAX_SIZE_USERNAME-1);
+	strncpy(acceptedConnections[i].username, message.username, MAX_SIZE_USERNAME);
 
 	char welcomeText[MAX_SIZE_MESSAGE];
 	sprintf(welcomeText, "--- Ha aparecido: %s ---", message.username);
