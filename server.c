@@ -292,6 +292,11 @@ ssize_t pollAllSocketsForMessages() {
 }
 
 int main(__attribute__((unused)) int argc, char *argv[]) {
+	if(argc < 2) {
+		printf("Uso: server <puerto>\n");
+		return 0;
+	}
+
 	printf("Starting...");
 
 	atexit(atExit);

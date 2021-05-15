@@ -76,6 +76,11 @@ void onExit(int signal) {
  * hagan comunicacion con el servidor.
  */
 int main(__attribute__((unused)) int argc, char *argv[]) {
+	if(argc < 3) {
+		printf("Uso: client <ip> <puerto>\n");
+		return 0;
+	}
+
 	atexit(atExit);
 	signal(SIGTERM, onExit);
 	signal(SIGKILL, onExit);
