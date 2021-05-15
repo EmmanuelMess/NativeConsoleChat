@@ -252,6 +252,45 @@ bool recieveUsername(size_t i, struct username_message message) {
 	return true;
 }
 
+ssize_t pollAllSocketsForMessages() {
+	fd_set readfds;
+	FD_ZERO(&readfds);
+
+	int maxfd = -1;
+	for (size_t i = 0; i < iRecieved; i++) {
+		if(!checkIsAlive(i)) {
+			continue;
+		}
+		int socket = acceptedConnections[i].socket;
+
+		FD_SET(socket, &readfds);
+		if (socket > maxfd) {
+			maxfd = socket;
+		}
+	}
+
+	struct timeval t = (struct timeval) { .tv_usec = 250*1000, .tv_sec = 0};
+	int status = select(maxfd + 1, &readfds, NULL, NULL, &t);
+	if (status <= 0) {
+		return -1;
+	}
+
+	ssize_t fdindex = -1;
+	for (size_t i = 0; i < iRecieved; i++) {
+		if(!checkIsAlive(i)) {
+			continue;
+		}
+		int socket = acceptedConnections[i].socket;
+
+		if (FD_ISSET(socket, &readfds)) {
+			fdindex = (ssize_t) i;
+			break;
+		}
+	}
+
+	return fdindex;
+}
+
 int main(__attribute__((unused)) int argc, char *argv[]) {
 	printf("Starting...");
 
@@ -272,66 +311,67 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 	printf("Started\n");
 	while(true) {
-		msleep(iRecieved > 2? 1000/iRecieved : 500);//TODO maybe pipe?
+		ssize_t i = pollAllSocketsForMessages();
+		if (i == -1) {
+			continue;
+		}
 
-		for (size_t i = 0; i < iRecieved; ++i) {
-			int socketClient = acceptedConnections[i].socket;
+		int socketClient = acceptedConnections[i].socket;
 
 #ifdef _WIN32
 #else
-			int count;
-			ioctl(socketClient, FIONREAD, &count);
+		int count;
+		ioctl(socketClient, FIONREAD, &count);
 
-			if (count != (ssize_t) sizeof(struct message)) {
-				continue;
-			}
+		if (count != (ssize_t) sizeof(struct message)) {
+			continue;
+		}
 #endif
-			struct message msg = {0};
+		struct message msg = {0};
 
-			ssize_t r;
-			r = recv(socketClient, CAST_TO_RECV_BUFFER(&msg), sizeof(struct message), ADD_FLAG_NONBLOCKING(0));
+		ssize_t r;
+		r = recv(socketClient, CAST_TO_RECV_BUFFER(&msg), sizeof(struct message), ADD_FLAG_NONBLOCKING(0));
 
 #ifdef _WIN32
-			if(r == WSAEWOULDBLOCK) {
-				continue;//Si no recibi nada sigo
-			}
-			if(r != (ssize_t) sizeof(struct message)) {
-				continue;
-			}
+		if(r == WSAEWOULDBLOCK) {
+			continue;//Si no recibi nada sigo
+		}
+		if(r != (ssize_t) sizeof(struct message)) {
+			continue;
+		}
 #else
-			if(r == EAGAIN) {
-				continue;//Si no recibi nada sigo
-			}
+		if (r == EAGAIN) {
+			continue;//Si no recibi nada sigo
+		}
 #endif
 
-			switch (msg.messageType){
-				case TEXT_MESSAGE: {
-					msg.textMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
-					recieveTextMessage(i, msg.textMessage);
-					break;
-				}
-				case USERNAME_MESSAGE: {
-					msg.usernameMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
-					if(!recieveUsername(i, msg.usernameMessage)) {
-						continue;
-					}
-					break;
-				}
-				case PRIVATE_MESSAGE: {
-					msg.privateMessage.receiver[MAX_SIZE_USERNAME - 1] = '\0';
-					msg.privateMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
-					receivePrivateMessage(i, msg);
-					break;
-				}
-				case USER_EXITS_MESSAGE: {
-					sendDisconnection(i);
-					break;
-				}
-				default: {
-					printf("Mensaje malformado (tipo: %d)\n", msg.messageType);
-					fflush(stdout);
+		switch (msg.messageType) {
+			case TEXT_MESSAGE: {
+				msg.textMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
+				recieveTextMessage(i, msg.textMessage);
+				break;
+			}
+			case USERNAME_MESSAGE: {
+				msg.usernameMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				if (!recieveUsername(i, msg.usernameMessage)) {
 					continue;
 				}
+				break;
+			}
+			case PRIVATE_MESSAGE: {
+				msg.privateMessage.receiver[MAX_SIZE_USERNAME - 1] = '\0';
+				msg.privateMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
+				receivePrivateMessage(i, msg);
+				break;
+			}
+			case USER_EXITS_MESSAGE: {
+				sendDisconnection(i);
+				break;
+			}
+			default: {
+				printf("Mensaje malformado (tipo: %d)\n", msg.messageType);
+				fflush(stdout);
+				continue;
 			}
 		}
 	}
