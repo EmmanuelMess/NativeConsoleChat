@@ -259,7 +259,7 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 	printf("Started\n");
 	while(true) {
-		msleep(20);
+		msleep(iRecieved > 2? 1000/iRecieved : 500);
 
 		for (size_t i = 0; i < iRecieved; ++i) {
 			int socketClient = acceptedConnections[i].socket;
