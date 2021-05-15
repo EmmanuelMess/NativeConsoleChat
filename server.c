@@ -1,17 +1,14 @@
-#include <netinet/in.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <arpa/inet.h>
 #include <stdatomic.h>
-#include <sys/ioctl.h>
 #include <string.h>
 #include <signal.h>
-#include <asm-generic/errno.h>
 #include <errno.h>
 #include <time.h>
+#include "compatinet.h"
 #include "messages.h"
 #define  EXIT_ON_FALUIRE(X)                  \
 if ((X) == -1) {                             \
@@ -49,8 +46,13 @@ void createServer(int port) {
 	socketServer = socket(AF_INET, SOCK_STREAM, 0);
 	EXIT_ON_FALUIRE(socketServer);
 
+#ifdef _WIN32
+	u_long mode = 1;  // 1 to enable non-blocking socket
+	ioctlsocket(socketServer, FIONBIO, &mode);
+#endif
+
 	int value = 1;
-	EXIT_ON_FALUIRE(setsockopt(socketServer, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(int)));
+	EXIT_ON_FALUIRE(setsockopt(socketServer, SOL_SOCKET, SO_REUSEADDR, CAST_TO_SEND_BUFFER(&value), sizeof(int)));
 
 	serverName.sin_family = AF_INET;
 	serverName.sin_addr.s_addr = inet_addr("0.0.0.0");
@@ -69,7 +71,7 @@ struct acceptedConnection {
 	char username[MAX_SIZE_USERNAME];
 };
 
-struct acceptedConnection acceptedConnections[25] = {0};
+struct acceptedConnection acceptedConnections[25] = {0};//TODO linked list
 atomic_uint iRecieved = 0;//Powered by Apple (tm)
 atomic_bool killed = false;
 
@@ -78,7 +80,8 @@ void sendFromServer(size_t i, char message[MAX_SIZE_MESSAGE]) {
 	messageFromServer.messageType = NAMED_TEXT_MESSAGE;
 	strcpy(messageFromServer.namedTextMessage.username, "Server");
 	strcpy(messageFromServer.namedTextMessage.data, message);
-	EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, &messageFromServer, sizeof(struct message), 0));
+
+	EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, CAST_TO_SEND_BUFFER(&messageFromServer), sizeof(struct message), 0));
 }
 
 void* awaitConnections(__attribute__((unused)) void *args) {
@@ -86,9 +89,13 @@ void* awaitConnections(__attribute__((unused)) void *args) {
 
 	while(!killed) {
 		struct sockaddr_in clientName = {0};
-		socklen_t size;
-		int socketClient = accept(socketServer, (struct sockaddr *) &clientName, &size);
 
+		ACCEPT_LEN_TYPE size;
+		int socketClient = accept(socketServer, (struct sockaddr *) &clientName, &size);
+#ifdef _WIN32
+		u_long mode = 1;  // 1 to enable non-blocking socket
+		ioctlsocket(socketClient, FIONBIO, &mode);
+#endif
 		acceptedConnections[iRecieved].socket = socketClient;
 
 		iRecieved++;
@@ -117,11 +124,11 @@ void onExit(int signal) {
 	}
 
 	for (size_t i = 0; i < iRecieved; ++i) {
-		shutdown(acceptedConnections[i].socket, SHUT_RDWR);
+		shutdown(acceptedConnections[i].socket, SHUTDOWN_ALL);
 		close(acceptedConnections[i].socket);
 	}
 
-	shutdown(socketServer, SHUT_RDWR);
+	shutdown(socketServer, SHUTDOWN_ALL);
 	close(socketServer);
 
 	printf("Bye!\n");
@@ -140,7 +147,7 @@ void sendDisconnection(size_t disconnectedUserIndex) {
 
 		// Verificacion de vividez
 		char buffer[32];
-		if (recv(acceptedConnections[i].socket, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0) {
+		if (recv(acceptedConnections[i].socket, buffer, sizeof(buffer), ADD_FLAG_NONBLOCKING(MSG_PEEK)) == 0) {
 			continue;
 		}
 
@@ -156,7 +163,7 @@ bool checkIsAlive(size_t i) {
 	}
 
 	char buffer[32];
-	if (recv(acceptedConnections[i].socket, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0) {
+	if (recv(acceptedConnections[i].socket, buffer, sizeof(buffer), ADD_FLAG_NONBLOCKING(MSG_PEEK)) == 0) {
 		acceptedConnections[i].dead = true;
 		printf("Usuario %s se desconecto\n", acceptedConnections[i].username);
 		fflush(stdout);
@@ -179,8 +186,7 @@ void recieveTextMessage(size_t i, struct text_message textMessage) {
 		msgResponse.messageType = NAMED_TEXT_MESSAGE;
 		strncpy(msgResponse.namedTextMessage.username, username, MAX_SIZE_USERNAME-1);
 		strncpy(msgResponse.namedTextMessage.data, textMessage.data, MAX_SIZE_MESSAGE - 1);
-
-		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, &msgResponse, sizeof(struct message), 0));
+		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&msgResponse), sizeof(struct message), 0));
 	}
 
 	printf("[%s]> %s\n", username, textMessage.data);
@@ -199,8 +205,8 @@ void receivePrivateMessage(size_t i, struct message originalMessage) {
 		}
 
 		if(strcmp(message->receiver, acceptedConnections[j].username) == 0) {
-			EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, &originalMessage, sizeof(struct message), 0));
-			EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, &originalMessage, sizeof(struct message), 0));
+			EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&originalMessage), sizeof(struct message), 0));
+			EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, CAST_TO_SEND_BUFFER(&originalMessage), sizeof(struct message), 0));
 			return;
 		}
 	}
@@ -221,7 +227,8 @@ bool recieveUsername(size_t i, struct username_message message) {
 	struct message messageUsedName = {0};
 	messageUsedName.messageType = RESPONSE_USERNAME_MESSAGE;
 	messageUsedName.responseUsernameMessage.isFailure = repeatedUsername;
-	EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, &messageUsedName, sizeof(struct message), 0));
+
+	EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, CAST_TO_SEND_BUFFER(&messageUsedName), sizeof(struct message), 0));
 
 	if(repeatedUsername) {
 		return false;
@@ -249,9 +256,15 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 	printf("Starting...");
 
 	atexit(atExit);
+
+#ifdef _WIN32
+	signal(SIGTERM, onExit);
+	signal(SIGABRT, onExit);
+#else
 	signal(SIGTERM, onExit);
 	signal(SIGKILL, onExit);
 	signal(SIGPIPE, onExit);
+#endif
 
 	createServer(atoi(argv[1]));
 
@@ -259,25 +272,37 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 	printf("Started\n");
 	while(true) {
-		msleep(iRecieved > 2? 1000/iRecieved : 500);
+		msleep(iRecieved > 2? 1000/iRecieved : 500);//TODO maybe pipe?
 
 		for (size_t i = 0; i < iRecieved; ++i) {
 			int socketClient = acceptedConnections[i].socket;
 
+#ifdef _WIN32
+#else
 			int count;
 			ioctl(socketClient, FIONREAD, &count);
 
 			if (count != (ssize_t) sizeof(struct message)) {
 				continue;
 			}
-
+#endif
 			struct message msg = {0};
-			ssize_t r;
-			r = recv(socketClient, &msg, sizeof(struct message), MSG_DONTWAIT);
 
-			if(r == EAGAIN) {//TODO esto usa todo el core
+			ssize_t r;
+			r = recv(socketClient, CAST_TO_RECV_BUFFER(&msg), sizeof(struct message), ADD_FLAG_NONBLOCKING(0));
+
+#ifdef _WIN32
+			if(r == WSAEWOULDBLOCK) {
 				continue;//Si no recibi nada sigo
 			}
+			if(r != (ssize_t) sizeof(struct message)) {
+				continue;
+			}
+#else
+			if(r == EAGAIN) {
+				continue;//Si no recibi nada sigo
+			}
+#endif
 
 			switch (msg.messageType){
 				case TEXT_MESSAGE: {
@@ -303,7 +328,7 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 					break;
 				}
 				default: {
-					printf("Mensaje malformado (tipo: %d, tamaño: %d)\n", msg.messageType, count);
+					printf("Mensaje malformado (tipo: %d)\n", msg.messageType);
 					fflush(stdout);
 					continue;
 				}

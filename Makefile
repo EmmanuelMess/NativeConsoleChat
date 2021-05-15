@@ -1,10 +1,13 @@
-all: client server
+all: bin/client bin/server
 
-server: bin server.c messages.h
+bin/server: bin server.c messages.h
 	gcc -Wall -Wextra -Werror -std=gnu11 messages.h server.c -lpthread -o bin/server
 
-client: bin client/client.c messages.h client/globalvars.h client/errormanagement.h obj/unrecievedqueue.o obj/senderthread.o obj/recieverthread.o obj/unsentqueue.o obj/ui.o
+bin/client: bin client/client.c messages.h client/globalvars.h client/errormanagement.h obj/unrecievedqueue.o obj/senderthread.o obj/recieverthread.o obj/unsentqueue.o obj/ui.o
 	gcc -g -Wall -Wextra -Werror -std=gnu11 client/globalvars.h client/errormanagement.h messages.h client/client.c obj/ui.o obj/unsentqueue.o obj/recieverthread.o obj/senderthread.o obj/unrecievedqueue.o -lpthread -lcurses -o bin/client
+
+bin/server.exe: bin server.c messages.h
+	x86_64-w64-mingw32-gcc-win32 -Wall -Wextra -Werror -std=gnu11  messages.h compatinet.h server.c -lpthread -o bin/server.exe -lwsock32 -lws2_32
 
 obj/senderthread.o: obj client/senderthread.c client/senderthread.h messages.h client/errormanagement.h client/globalvars.h obj/unrecievedqueue.o obj/unsentqueue.o
 	gcc -c -Wall -Wextra -Werror -std=gnu11 client/senderthread.c -o obj/senderthread.o
