@@ -78,7 +78,7 @@ _Noreturn void ui() {
 		size_t positionWhenCreatingName = queueInboundSize();
 
 		curs_set(1);
-		WINDOW *windowNombre = newwin(3, MAX_SIZE_USERNAME + 2, maxY / 2 - 1, (MAX_SIZE_USERNAME + 2) / 2 - 1);
+		WINDOW *windowNombre = newwin(3, MAX_SIZE_USERNAME + 2, maxY / 2 - 1,  (maxX)/2 - (MAX_SIZE_USERNAME + 2)/2 - 1);
 		box(windowNombre, 0, 0);        // 0, 0 gives default characters for the vertical and horizontal  lines
 		mvwprintw(windowNombre, 0, 2, "Nombre");
 		wrefresh(windowNombre);
