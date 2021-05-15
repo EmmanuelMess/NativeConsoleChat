@@ -138,7 +138,7 @@ _Noreturn void ui() {
 
 		size_t nextToPrint = 0; // Invariante el indice es el siguiente al ultimo impreso en pantalla
 		bool freeze = false;
-		char message[500];
+		char message[MAX_SIZE_MESSAGE];
 		int messageIterator = 0;
 
 		while (true) {
