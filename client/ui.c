@@ -15,39 +15,29 @@ bool isAcceptedChar(int c) {
 	return !iscntrl(c);
 }
 
-#define EXIT_COMMAND "/exit"
-#define PM_COMMAND "/msg "
-#define CHANGE_USERNAME_COMMAND "/nickname"
+#define EXIT_COMMAND_STRING "/exit"
+#define PM_COMMAND_STRING "/msg "
+#define CHANGE_USERNAME_COMMAND_STRING "/nickname"
 
-void queueOutboundMessage(char message[MAX_SIZE_MESSAGE]) {
-	struct message messageToServer = {0};
+enum command { EXIT, PM, CHANGE_USERNAME };
 
-	if(strcmp(message, EXIT_COMMAND) == 0) {
-		messageToServer.messageType = USER_EXITS_MESSAGE;
-		exit(0);
+bool checkIsCommand(char *message, enum command command) {
+	switch (command) {
+		case EXIT: {
+			return strcmp(message, EXIT_COMMAND_STRING) == 0;
+		}
+		case PM: {
+			bool hasAtLeastTwoSpaces = strchr(message, ' ') != NULL && strchr(message, ' ') != strrchr(message, ' ');
+			return strncmp(message, PM_COMMAND_STRING, strlen(PM_COMMAND_STRING)) == 0 && hasAtLeastTwoSpaces;
+		}
+		case CHANGE_USERNAME: {
+			return strncmp(message, CHANGE_USERNAME_COMMAND_STRING, strlen(CHANGE_USERNAME_COMMAND_STRING)) == 0;
+		}
+		default: {
+			perror("Unhandled command");
+			EXIT_ON_FALUIRE(-1);
+		}
 	}
-
-	bool hasAtLeastTwoSpaces = strchr(message, ' ') != NULL && strchr(message, ' ') != strrchr(message, ' ');
-
-	//CHANGE USERNAME COMMAND IS IN UI!
-
-	if(strncmp(message, PM_COMMAND, strlen(PM_COMMAND)) == 0 && hasAtLeastTwoSpaces) {
-		message += strlen(PM_COMMAND);
-		char *receiver = message;
-
-		message = strchr(message, ' ');
-		*message = '\0';
-		message++;
-
-		messageToServer.messageType = PRIVATE_MESSAGE;
-		strncpy(messageToServer.privateMessage.receiver, receiver, MAX_SIZE_USERNAME - 1);
-		strncpy(messageToServer.privateMessage.data, message, MAX_SIZE_MESSAGE - 1);
-	} else {
-		messageToServer.messageType = TEXT_MESSAGE;
-		strncpy(messageToServer.textMessage.data, message, MAX_SIZE_MESSAGE - 1);
-	}
-
-	queueOutboundInsert(messageToServer);
 }
 
 void writeMessageToWindow(WINDOW* w, int y, int x, struct message message) {
@@ -68,6 +58,11 @@ void writeMessageToWindow(WINDOW* w, int y, int x, struct message message) {
 	}
 }
 
+/**
+ * Esto esta programado como cambios a una consola,
+ * no como una serie de operaciones que construyen
+ * sobre las operaciones anteriores
+ */
 _Noreturn void ui() {
 	initscr();// Start curses mode
 
@@ -198,14 +193,41 @@ _Noreturn void ui() {
 
 				message[messageIterator] = '\0';
 
-				if(strncmp(message, CHANGE_USERNAME_COMMAND, strlen(CHANGE_USERNAME_COMMAND)) == 0) {
-					delwin(windowMessages);
-					delwin(windowText);
-					refresh();
-					goto readName;
+				{
+					if (checkIsCommand(message, CHANGE_USERNAME)) {
+						delwin(windowMessages);
+						delwin(windowText);
+						refresh();
+						goto readName;
+					}
+
+					if(checkIsCommand(message, EXIT)) {
+						queueOutboundInsert((struct message) { .messageType = USER_EXITS_MESSAGE });//Hope this reaches the server
+						exit(0);
+					}
+
+					struct message messageToServer = {0};
+					char *sentMessage = message;
+
+					if(checkIsCommand(sentMessage, PM)) {
+						sentMessage += strlen(PM_COMMAND_STRING);
+						char *receiver = sentMessage;
+
+						sentMessage = strchr(sentMessage, ' ');
+						*sentMessage = '\0';
+						sentMessage++;
+
+						messageToServer.messageType = PRIVATE_MESSAGE;
+						strncpy(messageToServer.privateMessage.receiver, receiver, MAX_SIZE_USERNAME - 1);
+						strncpy(messageToServer.privateMessage.data, sentMessage, MAX_SIZE_MESSAGE - 1);
+					} else {
+						messageToServer.messageType = TEXT_MESSAGE;
+						strncpy(messageToServer.textMessage.data, sentMessage, MAX_SIZE_MESSAGE);
+					}
+
+					queueOutboundInsert(messageToServer);
 				}
 
-				queueOutboundMessage(message);
 				messageIterator = 0;
 
 				for (int x = 1; x < maxX-1; ++x) {
