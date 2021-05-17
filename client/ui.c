@@ -7,19 +7,24 @@
 #include "unrecievedqueue.h"
 #include "errormanagement.h"
 
+char currentChannel[MAX_SIZE_CHANNEL] = "General";
+
 bool isPrintable(struct message message) {
-	return message.messageType == NAMED_TEXT_MESSAGE || message.messageType == PRIVATE_MESSAGE;
+	return (message.messageType == NAMED_TEXT_MESSAGE && strcmp(message.namedTextMessage.channel, currentChannel) == 0)
+			|| message.messageType == PRIVATE_MESSAGE;
 }
 
 bool isAcceptedChar(int c) {
-	return !iscntrl(c);
+	return 0 <= c && c <= 255 && !iscntrl(c);
 }
 
 #define EXIT_COMMAND_STRING "/exit"
 #define PM_COMMAND_STRING "/msg "
 #define CHANGE_USERNAME_COMMAND_STRING "/nickname"
+#define JOIN_STRING "/join "
+#define CHANNEL_STRING "/channel"
 
-enum command { EXIT, PM, CHANGE_USERNAME };
+enum command { EXIT, PM, CHANGE_USERNAME, JOIN, CHANNEL };
 
 bool checkIsCommand(char *message, enum command command) {
 	switch (command) {
@@ -32,6 +37,12 @@ bool checkIsCommand(char *message, enum command command) {
 		}
 		case CHANGE_USERNAME: {
 			return strncmp(message, CHANGE_USERNAME_COMMAND_STRING, strlen(CHANGE_USERNAME_COMMAND_STRING)) == 0;
+		}
+		case JOIN: {
+			return strncmp(message, JOIN_STRING, strlen(JOIN_STRING)) == 0;
+		}
+		case CHANNEL: {
+			return strncmp(message, CHANNEL_STRING, strlen(CHANNEL_STRING)) == 0;
 		}
 		default: {
 			perror("Unhandled command");
@@ -48,7 +59,7 @@ void writeMessageToWindow(WINDOW* w, int y, int x, struct message message) {
 
 	switch (message.messageType) {
 		case NAMED_TEXT_MESSAGE:
-			mvwprintw(w, y, x, "[%s]> %s", message.namedTextMessage.username, message.namedTextMessage.data);
+			mvwprintw(w, y, x, "[%s|%s]> %s", message.namedTextMessage.channel, message.namedTextMessage.username, message.namedTextMessage.data);
 			break;
 		case PRIVATE_MESSAGE:
 			mvwprintw(w, y, x, "[MP][%s->%s]> %s", message.privateMessage.sender, message.privateMessage.receiver, message.privateMessage.data);
@@ -206,6 +217,27 @@ _Noreturn void ui() {
 						exit(0);
 					}
 
+					if(checkIsCommand(message, JOIN)) {
+						char *channel = message + strlen(JOIN_STRING);
+
+						strncpy(currentChannel, channel, MAX_SIZE_CHANNEL-1);
+
+						struct message ficticiousChannelMessage = (struct message) {
+							.messageType = NAMED_TEXT_MESSAGE,
+							.namedTextMessage.username = "Server"
+						};
+
+						strncpy(ficticiousChannelMessage.namedTextMessage.channel, currentChannel, MAX_SIZE_CHANNEL);
+						sprintf(ficticiousChannelMessage.namedTextMessage.data, "Te uniste al canal: %s", currentChannel);
+
+						queueInboundInsert(ficticiousChannelMessage);
+
+						wscrl(windowMessages, printableCuantity);
+
+						nextToPrint = 0;
+						goto endParse;
+					}
+
 					struct message messageToServer = {0};
 					char *sentMessage = message;
 
@@ -222,19 +254,22 @@ _Noreturn void ui() {
 						strncpy(messageToServer.privateMessage.data, sentMessage, MAX_SIZE_MESSAGE - 1);
 					} else {
 						messageToServer.messageType = TEXT_MESSAGE;
+						strncpy(messageToServer.textMessage.channel, currentChannel, MAX_SIZE_CHANNEL);
 						strncpy(messageToServer.textMessage.data, sentMessage, MAX_SIZE_MESSAGE);
 					}
 
 					queueOutboundInsert(messageToServer);
 				}
 
-				messageIterator = 0;
+				endParse: {
+					messageIterator = 0;
 
-				for (int x = 1; x < maxX-1; ++x) {
-					mvwaddch(windowText, 1, x, ' ');
+					for (int x = 1; x < maxX - 1; ++x) {
+						mvwaddch(windowText, 1, x, ' ');
+					}
+					wmove(windowText, 1, 1);
+					wrefresh(windowText);
 				}
-				wmove(windowText, 1, 1);
-				wrefresh(windowText);
 				continue;
 			}
 
@@ -270,7 +305,11 @@ _Noreturn void ui() {
 				continue;
 			}
 
-			if (ch == KEY_DOWN && freeze) {
+			if (ch == KEY_DOWN) {
+				if(!freeze) {
+					continue;
+				}
+
 				if(nextToPrint == queueInboundSize()) {
 					freeze = false;
 					continue;

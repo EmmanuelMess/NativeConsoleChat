@@ -59,6 +59,7 @@ void sendFromServer(size_t i, char message[MAX_SIZE_MESSAGE]) {
 	struct message messageFromServer = {0};
 	messageFromServer.messageType = NAMED_TEXT_MESSAGE;
 	strcpy(messageFromServer.namedTextMessage.username, "Server");
+	strcpy(messageFromServer.namedTextMessage.channel, "General");
 	strcpy(messageFromServer.namedTextMessage.data, message);
 
 	EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, CAST_TO_SEND_BUFFER(&messageFromServer), sizeof(struct message), 0));
@@ -165,6 +166,7 @@ void recieveTextMessage(size_t i, struct text_message textMessage) {
 		struct message msgResponse = {0};
 		msgResponse.messageType = NAMED_TEXT_MESSAGE;
 		strncpy(msgResponse.namedTextMessage.username, username, MAX_SIZE_USERNAME-1);
+		strncpy(msgResponse.namedTextMessage.channel, textMessage.channel, MAX_SIZE_CHANNEL);
 		strncpy(msgResponse.namedTextMessage.data, textMessage.data, MAX_SIZE_MESSAGE);
 		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&msgResponse), sizeof(struct message), 0));
 	}
@@ -332,6 +334,7 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 		switch (msg.messageType) {
 			case TEXT_MESSAGE: {
+				msg.textMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
 				msg.textMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
 				recieveTextMessage(i, msg.textMessage);
 				break;

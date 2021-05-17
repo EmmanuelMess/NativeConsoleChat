@@ -12,6 +12,7 @@
 //TODO the pragma packed, it can be very inefficient
 
 #define MAX_SIZE_USERNAME 35
+#define MAX_SIZE_CHANNEL (MAX_SIZE_USERNAME)
 struct username_message {
 	char username[MAX_SIZE_USERNAME];
 };
@@ -19,10 +20,12 @@ struct username_message {
 #define MAX_SIZE_MESSAGE 1024
 struct text_message {
 	char data[MAX_SIZE_MESSAGE];
+	char channel[MAX_SIZE_CHANNEL];
 };
 
 struct named_text_message {
 	char username[MAX_SIZE_USERNAME];
+	char channel[MAX_SIZE_CHANNEL];
 	char data[MAX_SIZE_MESSAGE];
 };
 

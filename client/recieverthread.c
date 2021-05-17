@@ -22,6 +22,7 @@ void *reciever(__attribute__((unused)) void *args) {
 		switch (recieved.messageType){
 			case NAMED_TEXT_MESSAGE: {
 				recieved.namedTextMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				recieved.namedTextMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
 				recieved.namedTextMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
 				queueInboundInsert(recieved);
 				break;
