@@ -168,6 +168,8 @@ bool checkIsAlive(size_t i) {
 }
 
 void recieveTextMessage(size_t i, struct message textMessage) {
+	strcpy(textMessage.namedTextMessage.username, acceptedConnections[i].username);
+
 	for (size_t j = 0; j < iRecieved; ++j) {
 		if(!checkIsAlive(j)) {
 			continue;
@@ -367,7 +369,6 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 		switch (msg.messageType) {
 			case NAMED_TEXT_MESSAGE: {
-				strcpy(msg.namedTextMessage.username, acceptedConnections[i].username);
 				msg.namedTextMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
 				msg.namedTextMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
 				recieveTextMessage(i, msg);
