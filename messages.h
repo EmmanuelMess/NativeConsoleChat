@@ -34,7 +34,15 @@ struct response_username_message {
 	bool isFailure;
 };
 
-struct user_exits_message {};
+struct user_joins_message {
+	char username[MAX_SIZE_USERNAME];
+	char channel[MAX_SIZE_CHANNEL];
+};
+
+struct user_exits_message {
+	char username[MAX_SIZE_USERNAME];
+	char channel[MAX_SIZE_CHANNEL];
+};
 
 struct server_termination_message {};
 
@@ -44,7 +52,8 @@ struct server_termination_message {};
  *  - Siempre que se switch o if sobre un campo de este tipo, se debe incluir el caso UNSET (o default), que tira un error
  */
 enum message_type { UNSET = 0, USERNAME_MESSAGE = 1, NAMED_TEXT_MESSAGE = 3,
-	RESPONSE_USERNAME_MESSAGE = 4, PRIVATE_MESSAGE = 5, USER_EXITS_MESSAGE = 6, SERVER_TERMINATION_MESSAGE = 7 };
+	RESPONSE_USERNAME_MESSAGE = 4, PRIVATE_MESSAGE = 5, USER_EXITS_MESSAGE = 6, SERVER_TERMINATION_MESSAGE = 7,
+	USER_JOINS_MESSAGE = 8 };
 
 struct message {
 	union {
@@ -52,6 +61,7 @@ struct message {
 		struct named_text_message namedTextMessage;
 		struct response_username_message responseUsernameMessage;
 		struct private_message privateMessage;
+		struct user_joins_message userJoinsMessage;
 		struct user_exits_message userExitsMessage;
 		struct server_termination_message serverTerminationMessage;
 	};

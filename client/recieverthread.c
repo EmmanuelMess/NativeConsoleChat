@@ -34,6 +34,18 @@ void *reciever(__attribute__((unused)) void *args) {
 				queueInboundInsert(recieved);
 				break;
 			}
+			case USER_JOINS_MESSAGE: {
+				recieved.userJoinsMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				recieved.userJoinsMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
+				queueInboundInsert(recieved);
+				break;
+			}
+			case USER_EXITS_MESSAGE: {
+				recieved.userExitsMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				recieved.userExitsMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
+				queueInboundInsert(recieved);
+				break;
+			}
 			case RESPONSE_USERNAME_MESSAGE:
 			case SERVER_TERMINATION_MESSAGE: {
 				queueInboundInsert(recieved);

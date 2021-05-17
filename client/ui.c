@@ -10,7 +10,10 @@ char currentChannel[MAX_SIZE_CHANNEL] = "General";
 
 bool isPrintable(struct message message) {
 	return (message.messageType == NAMED_TEXT_MESSAGE && strcmp(message.namedTextMessage.channel, currentChannel) == 0)
-			|| message.messageType == PRIVATE_MESSAGE || message.messageType == SERVER_TERMINATION_MESSAGE;
+			|| message.messageType == PRIVATE_MESSAGE
+			|| message.messageType == SERVER_TERMINATION_MESSAGE
+			|| (message.messageType == USER_JOINS_MESSAGE && strcmp(message.userJoinsMessage.channel, currentChannel) == 0)
+			|| (message.messageType == USER_EXITS_MESSAGE && strcmp(message.userExitsMessage.channel, currentChannel) == 0);
 }
 
 bool isAcceptedChar(int c) {
@@ -62,6 +65,12 @@ void writeMessageToWindow(WINDOW* w, int y, int x, struct message message) {
 			break;
 		case PRIVATE_MESSAGE:
 			mvwprintw(w, y, x, "[MP][%s->%s]> %s", message.privateMessage.sender, message.privateMessage.receiver, message.privateMessage.data);
+			break;
+		case USER_JOINS_MESSAGE:
+			mvwprintw(w, y, x, "[%s|Server]> --- Se conecto: %s ---", message.userJoinsMessage.channel, message.userJoinsMessage.username);
+			break;
+		case USER_EXITS_MESSAGE:
+			mvwprintw(w, y, x, "[%s|Server]> --- Se desconecto: %s ---", message.userExitsMessage.channel, message.userExitsMessage.username);
 			break;
 		case SERVER_TERMINATION_MESSAGE:
 			mvwprintw(w, y, x, "El servidor murio, no queda esperanza alguna");
@@ -233,6 +242,14 @@ _Noreturn void ui() {
 						sprintf(ficticiousChannelMessage.namedTextMessage.data, "Te uniste al canal: %s", currentChannel);
 
 						queueInboundInsert(ficticiousChannelMessage);
+
+						struct message joinMessage = (struct message) {
+							.messageType = USER_JOINS_MESSAGE
+						};
+
+						strncpy(joinMessage.userJoinsMessage.channel, currentChannel, MAX_SIZE_CHANNEL);
+
+						queueOutboundInsert(joinMessage);
 
 						wscrl(windowMessages, printableCuantity);
 

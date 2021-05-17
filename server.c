@@ -49,6 +49,7 @@ struct acceptedConnection {
 	bool dead;
 	int socket;
 	char username[MAX_SIZE_USERNAME];
+	char channel[MAX_SIZE_CHANNEL];
 };
 
 struct acceptedConnection acceptedConnections[25] = {0};//TODO linked list
@@ -78,6 +79,7 @@ void* awaitConnections(__attribute__((unused)) void *args) {
 		ioctlsocket(socketClient, FIONBIO, &mode);
 #endif
 		acceptedConnections[iRecieved].socket = socketClient;
+		strcpy(acceptedConnections[iRecieved].channel, "General");
 
 		iRecieved++;
 	}
@@ -139,9 +141,12 @@ void sendDisconnection(size_t disconnectedUserIndex) {
 			continue;
 		}
 
-		char text[MAX_SIZE_MESSAGE];
-		sprintf(text, "--- Se desconecto: %s ---", acceptedConnections[disconnectedUserIndex].username);
-		sendFromServer(i, text);
+		struct message messageFromServer = {0};
+		messageFromServer.messageType = USER_EXITS_MESSAGE;
+		strcpy(messageFromServer.userExitsMessage.username, acceptedConnections[disconnectedUserIndex].username);
+		strcpy(messageFromServer.userExitsMessage.channel, acceptedConnections[disconnectedUserIndex].channel);
+
+		EXIT_ON_FALUIRE(send(acceptedConnections[i].socket, CAST_TO_SEND_BUFFER(&messageFromServer), sizeof(struct message), 0));
 	}
 }
 
@@ -218,20 +223,48 @@ bool recieveUsername(size_t i, struct username_message message) {
 
 	strncpy(acceptedConnections[i].username, message.username, MAX_SIZE_USERNAME);
 
-	char welcomeText[MAX_SIZE_MESSAGE];
-	sprintf(welcomeText, "--- Ha aparecido: %s ---", message.username);
+	struct message messageFromServer = {0};
+	messageFromServer.messageType = USER_JOINS_MESSAGE;
+	strcpy(messageFromServer.userJoinsMessage.username, acceptedConnections[i].username);
+	strcpy(messageFromServer.userJoinsMessage.channel, acceptedConnections[i].channel);
 
 	for (size_t j = 0; j < i; ++j) {
 		if(!checkIsAlive(j)) {
 			continue;
 		}
 
-		sendFromServer(j, welcomeText);
+		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&messageFromServer), sizeof(struct message), 0));
 	}
 
 	printf("--- Ha aparecido: %s ---\n", message.username);
 	fflush(stdout);
 	return true;
+}
+
+void changedRoom(size_t i, struct message message) {
+	struct message messageExitsRoom = {0};
+	messageExitsRoom.messageType = USER_EXITS_MESSAGE;
+	strcpy(messageExitsRoom.userExitsMessage.username, acceptedConnections[i].username);
+	strcpy(messageExitsRoom.userExitsMessage.channel, acceptedConnections[i].channel);
+
+	strncpy(acceptedConnections[i].channel, message.namedTextMessage.channel, MAX_SIZE_CHANNEL);
+
+	struct message messageJoinsRoom = {0};
+	messageJoinsRoom.messageType = USER_JOINS_MESSAGE;
+	strcpy(messageJoinsRoom.userJoinsMessage.username, acceptedConnections[i].username);
+	strcpy(messageJoinsRoom.userJoinsMessage.channel, acceptedConnections[i].channel);
+
+	for (size_t j = 0; j < i; ++j) {
+		if(!checkIsAlive(j)) {
+			continue;
+		}
+
+		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&messageExitsRoom), sizeof(struct message), 0));
+		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&messageJoinsRoom), sizeof(struct message), 0));
+	}
+
+	printf("--- %s cambio de sala a %s ---\n", acceptedConnections[i].username, acceptedConnections[i].channel);
+	fflush(stdout);
 }
 
 ssize_t pollAllSocketsForMessages() {
@@ -334,7 +367,7 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 
 		switch (msg.messageType) {
 			case NAMED_TEXT_MESSAGE: {
-				msg.namedTextMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				strcpy(msg.namedTextMessage.username, acceptedConnections[i].username);
 				msg.namedTextMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
 				msg.namedTextMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
 				recieveTextMessage(i, msg);
@@ -351,6 +384,12 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 				msg.privateMessage.receiver[MAX_SIZE_USERNAME - 1] = '\0';
 				msg.privateMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
 				receivePrivateMessage(i, msg);
+				break;
+			}
+			case USER_JOINS_MESSAGE: {
+				if(strncmp(acceptedConnections[i].channel, msg.userJoinsMessage.channel, MAX_SIZE_CHANNEL) != 0) {
+					changedRoom(i, msg);
+				}
 				break;
 			}
 			case USER_EXITS_MESSAGE: {

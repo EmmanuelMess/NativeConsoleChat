@@ -41,7 +41,8 @@ void *sender(__attribute__((unused)) void *args) {
 			case NAMED_TEXT_MESSAGE:
 			case USERNAME_MESSAGE:
 			case PRIVATE_MESSAGE:
-			case USER_EXITS_MESSAGE: {
+			case USER_JOINS_MESSAGE:
+			case USER_EXITS_MESSAGE:{
 				sendToServer(message.message);
 				break;
 			}
