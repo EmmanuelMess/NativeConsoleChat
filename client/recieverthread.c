@@ -34,7 +34,8 @@ void *reciever(__attribute__((unused)) void *args) {
 				queueInboundInsert(recieved);
 				break;
 			}
-			case RESPONSE_USERNAME_MESSAGE: {
+			case RESPONSE_USERNAME_MESSAGE:
+			case SERVER_TERMINATION_MESSAGE: {
 				queueInboundInsert(recieved);
 				break;
 			}

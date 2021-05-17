@@ -105,8 +105,15 @@ void onExit(int signal) {
 	}
 
 	for (size_t i = 0; i < iRecieved; ++i) {
-		shutdown(acceptedConnections[i].socket, SHUTDOWN_ALL);
-		close(acceptedConnections[i].socket);
+		int socket = acceptedConnections[i].socket;
+
+		if(!acceptedConnections[i].dead) {
+			struct message exitMessage = { .messageType = SERVER_TERMINATION_MESSAGE };
+			EXIT_ON_FALUIRE(send(socket, CAST_TO_SEND_BUFFER(&exitMessage), sizeof(struct message), 0));
+		}
+
+		shutdown(socket, SHUTDOWN_ALL);
+		close(socket);
 	}
 
 	shutdown(socketServer, SHUTDOWN_ALL);

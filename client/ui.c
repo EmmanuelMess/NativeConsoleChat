@@ -1,6 +1,5 @@
 #include <string.h>
 #include <ctype.h>
-#include <locale.h>
 #include "ui.h"
 #include "../messages.h"
 #include "unsentqueue.h"
@@ -11,7 +10,7 @@ char currentChannel[MAX_SIZE_CHANNEL] = "General";
 
 bool isPrintable(struct message message) {
 	return (message.messageType == NAMED_TEXT_MESSAGE && strcmp(message.namedTextMessage.channel, currentChannel) == 0)
-			|| message.messageType == PRIVATE_MESSAGE;
+			|| message.messageType == PRIVATE_MESSAGE || message.messageType == SERVER_TERMINATION_MESSAGE;
 }
 
 bool isAcceptedChar(int c) {
@@ -63,6 +62,9 @@ void writeMessageToWindow(WINDOW* w, int y, int x, struct message message) {
 			break;
 		case PRIVATE_MESSAGE:
 			mvwprintw(w, y, x, "[MP][%s->%s]> %s", message.privateMessage.sender, message.privateMessage.receiver, message.privateMessage.data);
+			break;
+		case SERVER_TERMINATION_MESSAGE:
+			mvwprintw(w, y, x, "El servidor murio, no queda esperanza alguna");
 			break;
 		default:
 			EXIT_ON_FALUIRE(-1);
