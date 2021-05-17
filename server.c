@@ -155,23 +155,16 @@ bool checkIsAlive(size_t i) {
 	return true;
 }
 
-void recieveTextMessage(size_t i, struct text_message textMessage) {
-	char *username = acceptedConnections[i].username;
-
+void recieveTextMessage(size_t i, struct message textMessage) {
 	for (size_t j = 0; j < iRecieved; ++j) {
 		if(!checkIsAlive(j)) {
 			continue;
 		}
 
-		struct message msgResponse = {0};
-		msgResponse.messageType = NAMED_TEXT_MESSAGE;
-		strncpy(msgResponse.namedTextMessage.username, username, MAX_SIZE_USERNAME-1);
-		strncpy(msgResponse.namedTextMessage.channel, textMessage.channel, MAX_SIZE_CHANNEL);
-		strncpy(msgResponse.namedTextMessage.data, textMessage.data, MAX_SIZE_MESSAGE);
-		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&msgResponse), sizeof(struct message), 0));
+		EXIT_ON_FALUIRE(send(acceptedConnections[j].socket, CAST_TO_SEND_BUFFER(&textMessage), sizeof(struct message), 0));
 	}
 
-	printf("[%s]> %s\n", username, textMessage.data);
+	printf("[%s|%s]> %s\n", textMessage.namedTextMessage.channel, acceptedConnections[i].username, textMessage.namedTextMessage.data);
 }
 
 void receivePrivateMessage(size_t i, struct message originalMessage) {
@@ -333,10 +326,11 @@ int main(__attribute__((unused)) int argc, char *argv[]) {
 #endif
 
 		switch (msg.messageType) {
-			case TEXT_MESSAGE: {
-				msg.textMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
-				msg.textMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
-				recieveTextMessage(i, msg.textMessage);
+			case NAMED_TEXT_MESSAGE: {
+				msg.namedTextMessage.username[MAX_SIZE_USERNAME - 1] = '\0';
+				msg.namedTextMessage.channel[MAX_SIZE_CHANNEL - 1] = '\0';
+				msg.namedTextMessage.data[MAX_SIZE_MESSAGE - 1] = '\0';
+				recieveTextMessage(i, msg);
 				break;
 			}
 			case USERNAME_MESSAGE: {

@@ -18,6 +18,11 @@ void sendToServer(struct message message) {
 			strncpy(username, message.usernameMessage.username, MAX_SIZE_USERNAME);
 			break;
 		}
+		case NAMED_TEXT_MESSAGE: {
+			// Se guarda el nombre de usuario del cliente
+			strncpy(message.namedTextMessage.username, username, MAX_SIZE_USERNAME);
+			break;
+		}
 		default:
 			//NOTHING
 			break;
@@ -33,8 +38,8 @@ void *sender(__attribute__((unused)) void *args) {
 		struct unsent_message message = queueOutboundPeek();//Bloquea
 
 		switch (message.message.messageType) {
+			case NAMED_TEXT_MESSAGE:
 			case USERNAME_MESSAGE:
-			case TEXT_MESSAGE:
 			case PRIVATE_MESSAGE:
 			case USER_EXITS_MESSAGE: {
 				sendToServer(message.message);

@@ -253,9 +253,9 @@ _Noreturn void ui() {
 						strncpy(messageToServer.privateMessage.receiver, receiver, MAX_SIZE_USERNAME - 1);
 						strncpy(messageToServer.privateMessage.data, sentMessage, MAX_SIZE_MESSAGE - 1);
 					} else {
-						messageToServer.messageType = TEXT_MESSAGE;
-						strncpy(messageToServer.textMessage.channel, currentChannel, MAX_SIZE_CHANNEL);
-						strncpy(messageToServer.textMessage.data, sentMessage, MAX_SIZE_MESSAGE);
+						messageToServer.messageType = NAMED_TEXT_MESSAGE;
+						strncpy(messageToServer.namedTextMessage.channel, currentChannel, MAX_SIZE_CHANNEL);
+						strncpy(messageToServer.namedTextMessage.data, sentMessage, MAX_SIZE_MESSAGE);
 					}
 
 					queueOutboundInsert(messageToServer);
